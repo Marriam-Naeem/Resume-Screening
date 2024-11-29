@@ -36,13 +36,10 @@ def get_text_chunks(text):
     chunks = text_splitter.split_text(text)
     return chunks
 
-
 def get_vector_store(text_chunks):
-    
     vector_store = Chroma.from_texts(texts= text_chunks, embedding=embeddings,persist_directory="vector_store")
 
 def get_relevant_docs_basic(user_query):
-    embeddings = GoogleGenerativeAIEmbeddings(model = "models/embedding-001")
     vectordb = Chroma(persist_directory="./vector_store",
                       embedding_function=embeddings)
     retriever = vectordb.as_retriever(score_threshold=0.5)
@@ -57,11 +54,9 @@ def get_relevant_docs_with_multi_query(user_query):
     # Example of a custom retriever (replace with actual implementation)
     return [{"page_content": "Sample content from custom retriever"}]
 
-def get_relevant_docs_with_ensemble_query(user_query):
+def get_relevant_docs_with_ensemble(user_query):
     # Example of OpenAI retriever (replace with actual implementation)
     return [{"page_content": "Sample content from OpenAI retriever"}]
-
-
 
 def make_rag_prompt(query, relevant_passage):
     relevant_passage = ''.join(relevant_passage)
@@ -87,9 +82,9 @@ def generate_response(user_prompt):
     return answer.content
 
 
-def generate_answer(query):
+def generate_answer(query, retriever_type):
     load_dotenv()
-    relevant_text = get_relevant_docs(query)
+    relevant_text = get_relevant_docs_by_selection(retriever_type, query)
     text = " \n".join([doc.page_content for doc in relevant_text])
     prompt = make_rag_prompt(query, relevant_passage=text)
     print(prompt)
@@ -98,30 +93,17 @@ def generate_answer(query):
 
 
 
-def user_input(user_question):
-    
-    
-    vectordb = Chroma(persist_directory="vector_store",
-                      embedding_function=embeddings)
-
-    
-    response = generate_answer(user_question)
-
-    print(response)
-    st.write("Answer: ", response)
-
-
-def get_relevant_docs_by_selectiogin(retriever_type, user_query):
-    if retriever_type == "Chroma Retriever":
-        return get_relevant_docs_with_chroma(user_query)
-    elif retriever_type == "Custom Retriever":
-        return get_relevant_docs_with_custom_retriever(user_query)
-    elif retriever_type == "OpenAI Retriever":
-        return get_relevant_docs_with_openai_retriever(user_query)
-    elif retriever_type == "Vector Search":
-        return get_relevant_docs_with_vector_search(user_query)
+def get_relevant_docs_by_selection(retriever_type, user_query):
+    if retriever_type == "Basic Simliarity Search":
+        return get_relevant_docs_basic(user_query)
+    elif retriever_type == "BM25 Search":
+        return get_relevant_docs_with_BM25(user_query)
+    elif retriever_type == "MultiQuery Retriever":
+        return get_relevant_docs_with_multi_query(user_query)
+    elif retriever_type == "Ensemble Retriever":
+        return get_relevant_docs_with_ensemble(user_query)
     else:
-        return []
+        return get_relevant_docs_basic(user_query)
 
 
 def main():
@@ -142,10 +124,7 @@ def main():
                 st.success("Done")
 
     if user_question:
-        relevant_docs = get_relevant_docs_by_selection(retriever_type, user_question)
-        text = " \n".join([doc["page_content"] for doc in relevant_docs])
-        prompt = make_rag_prompt(user_question, relevant_passage=text)
-        response = generate_response(prompt)
+        response = generate_answer(user_question, retriever_type)
         st.write("Answer: ", response)
 
 
