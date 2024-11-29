@@ -107,10 +107,9 @@ def get_relevant_docs_by_selection(retriever_type, user_query):
 
 
 def main():
-    st.set_page_config("Chat PDF")
-    st.header("Chat with PDF using Gemini💁")
+    st.set_page_config("Resume Screening App", page_icon="📄", layout="wide")
 
-    user_question = st.text_input("Ask a Question from the PDF Files")
+    user_question = st.text_input("Enter your job description:")
 
     with st.sidebar:
         st.title("Menu:")
