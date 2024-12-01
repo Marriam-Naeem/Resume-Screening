@@ -184,10 +184,12 @@ def reciprocal_rank_fusion(results, k=60):
     
     # Rerank documents based on their scores
     reranked_results = [
-        (loads(doc), score)  # Deserialize the document back to dictionary
+        (loads(doc),score, f"This value {score} refers to the document's relevance based on its rank across multiple subqueries.")
         for doc, score in sorted(fused_scores.items(), key=lambda x: x[1], reverse=True)
     ]
+    
     return reranked_results
+
 
 def get_relevant_docs_RAGFusion(user_query):
     subquestions = generate_subquestions(user_query)
@@ -232,25 +234,26 @@ def get_relevant_docs_with_ensemble(user_query):
     return [{"page_content": "Sample content from OpenAI retriever"}]
 
 def make_rag_prompt(query, relevant_passage):
-    # relevant_passage = ''.join(relevant_passage)
     prompt = (
         f"You are a helpful assistant that evaluates resumes based on the provided job description. "
         f"Only use the information from the reference passage provided below. Do not include outside information or assumptions."
         f"\n\nYour task is as follows:"
         f"\n1. Analyze the given job description and compare it with the resumes provided in the context."
         f"\n2. Identify the resume that best matches the job description, and provide:"
-        f"   - The metadata of the best-matching resume (e.g., candidate name, experience, skills etc.)."
+        f"   - The metadata of the best-matching resume (e.g., candidate name, experience, skills, etc.)."
         f"   - The index of the best-matching resume in the context."
         f"   - A detailed explanation of why this resume is the best match for the job description."
         f"\n3. Rank the remaining resumes in order of relevance to the job description. For each, explain why it does not match perfectly and what areas are lacking compared to the best match."
-        f"\n Remember there is no repition the data, so if some information us repeated, consider that only once in result"
-        f"\n Start your response with 'Here is the Resume that Best Matches the Job Description that you have provided:'"
+        f"\n4. **Important**: The `source` and `index` in the metadata are considered the same. If multiple documents share the same `source` and `index`, they refer to the same candidate and should be treated as such. Ignore the `row` number in the metadata as it is not relevant for evaluating candidates."
+        f"\n5. Ensure there is no repetition of data. If multiple documents share the same `source` and `index`, only consider the information once."
+        f"\n\nStart your response with 'Here is the Resume that Best Matches the Job Description that you have provided:'"
         f"\n\nMaintain a professional and concise tone. Ensure your response is logical, clearly structured, and strictly based on the context provided."
         f"\n\nQUESTION: '{query}'\n"
         f"PASSAGE: '{relevant_passage}'\n\n"
         f"ANSWER:"
     )
     return prompt
+
 
 
 def generate_response(user_prompt):
