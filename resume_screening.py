@@ -7,6 +7,7 @@ import google.generativeai as genai
 from langchain.vectorstores import Chroma 
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.chains.question_answering import load_qa_chain
+from langchain.retrievers.multi_query import MultiQueryRetriever
 from langchain.prompts import PromptTemplate
 from dotenv import load_dotenv
 
@@ -42,7 +43,7 @@ def get_vector_store(text_chunks):
 def get_relevant_docs_basic(user_query):
     vectordb = Chroma(persist_directory="./vector_store",
                       embedding_function=embeddings)
-    retriever = vectordb.as_retriever(score_threshold=0.5)
+    retriever = vectordb.as_retriever(score_threshold=0.7)
     relevant_docs = retriever.invoke(user_query)
     return relevant_docs
 
@@ -51,8 +52,12 @@ def get_relevant_docs_with_BM25(user_query):
     return [{"page_content": "Sample content from vector search retriever"}]
 
 def get_relevant_docs_with_multi_query(user_query):
-    # Example of a custom retriever (replace with actual implementation)
-    return [{"page_content": "Sample content from custom retriever"}]
+    vectordb = Chroma(persist_directory="./vector_store",
+                      embedding_function=embeddings)
+    retriever = MultiQueryRetriever.from_llm(
+    retriever=vectordb.as_retriever(score_threshold=0.5), llm=llm)
+    relevant_docs = retriever.invoke(user_query)
+    return relevant_docs
 
 def get_relevant_docs_with_ensemble(user_query):
     # Example of OpenAI retriever (replace with actual implementation)
@@ -114,7 +119,7 @@ def main():
     with st.sidebar:
         st.title("Menu:")
         pdf_docs = st.file_uploader("Upload your PDF Files and Click on the Submit & Process Button", accept_multiple_files=True)
-        retriever_type = st.selectbox("Select Retriever Type", ["Chroma Retriever", "Custom Retriever", "OpenAI Retriever", "Vector Search"])
+        retriever_type = st.selectbox("Select Retriever Type", ["Basic Simliarity Search", "BM25 Search", "MultiQuery Retriever", "Ensemble Retriever"])
         if st.button("Submit & Process"):
             with st.spinner("Processing..."):
                 raw_text = get_pdf_text(pdf_docs)
