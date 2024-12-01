@@ -57,6 +57,12 @@ def process_pdfs(pdf_docs):
 
 
 def get_vector_store():
+    vectordb = Chroma(persist_directory="vector_store",
+                      embedding_function=embeddings)
+    ids = vectordb.get().get("ids")
+    for ids in ids:
+        vectordb.delete(ids=ids)
+        print(f"Deleted {ids}")
     loader = CSVLoader(file_path='data.csv', source_column="index")
     data = loader.load()
     #print(data)
@@ -64,6 +70,8 @@ def get_vector_store():
         documents=data, 
         embedding=embeddings, 
         persist_directory="vector_store")
+    vectordb.persist()
+    print(vectordb.get().get("embeddings"))
 
 
 
