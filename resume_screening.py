@@ -171,13 +171,20 @@ def reciprocal_rank_fusion(results, k=60):
     # Iterate through results for each subquery
     for docs in results:
         for rank, doc in enumerate(docs):
-            doc_str = dumps(doc)
+            # Convert Document object to a dictionary
+            doc_dict = {
+                "page_content": doc.page_content,
+                "metadata": doc.metadata,
+            }
+            doc_str = dumps(doc_dict)  # Serialize the dictionary
             
             if doc_str not in fused_scores:
                 fused_scores[doc_str] = 0
-            fused_scores[doc_str] += 1 / (rank + k) 
+            fused_scores[doc_str] += 1 / (rank + k)
+    
+    # Rerank documents based on their scores
     reranked_results = [
-        (loads(doc), score)  # Deserialize the document back to its original form
+        (loads(doc), score)  # Deserialize the document back to dictionary
         for doc, score in sorted(fused_scores.items(), key=lambda x: x[1], reverse=True)
     ]
     return reranked_results
@@ -201,10 +208,15 @@ def get_relevant_docs_basic(user_query):
     return relevant_docs
 
 def get_relevant_docs_with_BM25(user_query):
-    vectordb = Chroma(persist_directory="vector_store",
-                      embedding_function=embeddings)
-    retriever = vectordb.as_retriever(score_threshold=0.5)
-    relevant_docs = retriever.invoke(user_query)
+
+    loader = CSVLoader(file_path='data.csv', source_column="index")
+    data = loader.load()
+
+    bm25_retriever = BM25Retriever.from_documents(
+        data, 
+        k=5
+    )
+    relevant_docs = bm25_retriever.invoke(user_query)
     return relevant_docs
 
 def get_relevant_docs_with_multi_query(user_query):
@@ -220,7 +232,7 @@ def get_relevant_docs_with_ensemble(user_query):
     return [{"page_content": "Sample content from OpenAI retriever"}]
 
 def make_rag_prompt(query, relevant_passage):
-    relevant_passage = ''.join(relevant_passage)
+    # relevant_passage = ''.join(relevant_passage)
     prompt = (
         f"You are a helpful assistant that evaluates resumes based on the provided job description. "
         f"Only use the information from the reference passage provided below. Do not include outside information or assumptions."
@@ -249,8 +261,8 @@ def generate_response(user_prompt):
 def generate_answer(query, retriever_type):
     load_dotenv()
     relevant_text = get_relevant_docs_by_selection(retriever_type, query)
-    text = " \n".join([doc.page_content for doc in relevant_text])
-    prompt = make_rag_prompt(query, relevant_passage=text)
+    # text = " \n".join([doc.page_content for doc in relevant_text])
+    prompt = make_rag_prompt(query, relevant_passage=relevant_text)
     print(prompt)
     answer = generate_response(prompt)
     return answer
