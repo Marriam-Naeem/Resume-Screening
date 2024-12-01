@@ -3,12 +3,9 @@ from PyPDF2 import PdfReader
 import os
 from json import dumps, loads
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
-import google.generativeai as genai
 from langchain_community.vectorstores import Chroma
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.chains.question_answering import load_qa_chain
 from langchain.retrievers.multi_query import MultiQueryRetriever
-from langchain.prompts import PromptTemplate
 from dotenv import load_dotenv
 from langchain_community.retrievers import BM25Retriever
 from langchain.retrievers import EnsembleRetriever
