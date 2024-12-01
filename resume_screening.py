@@ -6,6 +6,7 @@ import google.generativeai as genai
 from langchain_community.vectorstores import Chroma
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.chains.question_answering import load_qa_chain
+from langchain.retrievers.multi_query import MultiQueryRetriever
 from langchain.prompts import PromptTemplate
 from dotenv import load_dotenv
 from langchain_community.retrievers import BM25Retriever
@@ -84,7 +85,6 @@ def get_relevant_docs_with_multi_query(user_query):
     retriever=vectordb.as_retriever(score_threshold=0.5), llm=llm)
     relevant_docs = retriever.invoke(user_query)
     return relevant_docs
-
 
 def get_relevant_docs_with_ensemble(user_query):
     # Example of OpenAI retriever (replace with actual implementation)
