@@ -4,7 +4,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 import os
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 import google.generativeai as genai
-from langchain.vectorstores import Chroma 
+from langchain_community.vectorstores import Chroma
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.chains.question_answering import load_qa_chain
 from langchain.prompts import PromptTemplate
@@ -67,11 +67,9 @@ def make_rag_prompt(query, relevant_passage):
     )
     return prompt
 
-
 def generate_response(user_prompt):
     answer = llm.invoke(user_prompt)
     return answer.content
-
 
 def generate_answer(query):
     load_dotenv()
