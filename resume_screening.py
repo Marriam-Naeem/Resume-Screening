@@ -62,7 +62,7 @@ def get_vector_store():
     ids = vectordb.get().get("ids")
     for ids in ids:
         vectordb.delete(ids=ids)
-        print(f"Deleted {ids}")
+        #print(f"Deleted {ids}")
     loader = CSVLoader(file_path='data.csv', source_column="index")
     data = loader.load()
     #print(data)
@@ -71,7 +71,6 @@ def get_vector_store():
         embedding=embeddings, 
         persist_directory="vector_store")
     vectordb.persist()
-    print(vectordb.get().get("embeddings"))
 
 
 
