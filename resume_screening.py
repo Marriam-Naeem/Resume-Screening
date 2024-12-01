@@ -11,6 +11,7 @@ from langchain.retrievers.multi_query import MultiQueryRetriever
 from langchain.prompts import PromptTemplate
 from dotenv import load_dotenv
 from langchain_community.retrievers import BM25Retriever
+from langchain.retrievers import EnsembleRetriever
 import pandas as pd
 from langchain_community.document_loaders import CSVLoader 
 from langchain.retrievers.multi_query import MultiQueryRetriever
@@ -36,6 +37,8 @@ def process_pdfs(pdf_docs):
     index = 1
 
     for pdf in pdf_docs:
+
+
         pdf_reader = PdfReader(pdf)
         text = "".join([page.extract_text() for page in pdf_reader.pages])
 
@@ -231,28 +234,42 @@ def get_relevant_docs_with_BM25(user_query):
 def get_relevant_docs_with_multi_query(user_query):
     vectordb = Chroma(persist_directory="./vector_store",
                       embedding_function=embeddings)
-    retriever = MultiQueryRetriever.from_llm(
-    retriever=vectordb.as_retriever(score_threshold=0.5), llm=llm)
+    retriever = MultiQueryRetriever.from_llm(retriever=vectordb.as_retriever(score_threshold=0.5), llm=llm)
     relevant_docs = retriever.invoke(user_query)
     return relevant_docs
 
 def get_relevant_docs_with_ensemble(user_query):
-    # Example of OpenAI retriever (replace with actual implementation)
-    return [{"page_content": "Sample content from OpenAI retriever"}]
+    vectordb = Chroma(persist_directory="./vector_store",
+                      embedding_function=embeddings)
+    multi_query_retriever = MultiQueryRetriever.from_llm(retriever=vectordb.as_retriever(score_threshold=0.5), llm=llm)
+
+    loader = CSVLoader(file_path='data.csv', source_column="index")
+    data = loader.load()
+
+    bm25_retriever = BM25Retriever.from_documents(
+        data, 
+        k=5
+    )
+
+    ensemble_retriever = EnsembleRetriever(retrievers=[bm25_retriever, multi_query_retriever], weights=[0.5, 0.5])
+    relevant_docs = ensemble_retriever.invoke(user_query)
+    return relevant_docs
+
 
 def make_rag_prompt(query, relevant_passage):
     prompt = (
         f"You are a helpful assistant that evaluates resumes based on the provided job description. "
         f"Only use the information from the reference passage provided below. Do not include outside information or assumptions."
+        f"Please know that there is no repetition of data. If multiple documents share the same `source` in the metadata and `index` in the page content, It means that they are from the same resume"
+        f"If the question is not related to the resume, politely respond that you are tuned to only answer questions that are related to resumes."
         f"\n\nYour task is as follows:"
         f"\n1. Analyze the given job description and compare it with the resumes provided in the context."
         f"\n2. Identify the resume that best matches the job description, and provide:"
-        f"   - The metadata of the best-matching resume (e.g., candidate name, experience, skills, etc.)."
+        f"   - The Candidate's name. , index of the resume, experince, education, skills, and any other relevant information."
         f"   - The index of the best-matching resume in the context."
         f"   - A detailed explanation of why this resume is the best match for the job description."
         f"\n3. Rank the remaining resumes in order of relevance to the job description. For each, explain why it does not match perfectly and what areas are lacking compared to the best match."
-        f"\n4. **Important**: The `source` and `index` in the metadata are considered the same. If multiple documents share the same `source` and `index`, they refer to the same candidate and should be treated as such. Ignore the `row` number in the metadata as it is not relevant for evaluating candidates."
-        f"\n5. Ensure there is no repetition of data. If multiple documents share the same `source` and `index`, only consider the information once."
+        f"\n4. **Important**: The `source` in the meta data and `index` in the page content are considered the same. If multiple documents share the same `source` and `index`, they refer to the same candidate and should be treated as such. Ignore the `row` number in the metadata as it is not relevant for evaluating candidates."
         f"\n\nStart your response with 'Here is the Resume that Best Matches the Job Description that you have provided:'"
         f"\n\nMaintain a professional and concise tone. Ensure your response is logical, clearly structured, and strictly based on the context provided."
         f"\n\nQUESTION: '{query}'\n"
@@ -299,19 +316,26 @@ def main():
 
     with st.sidebar:
         st.title("Menu:")
-        pdf_docs = st.file_uploader("Upload your PDF Files and Click on the Submit & Process Button", accept_multiple_files=True)
-        retriever_type = st.selectbox("Select Retriever Type", ["Basic Simliarity Search", "BM25 Search", "MultiQuery Retriever", "Ensemble Retriever", "RAG Fusion"])
-        if st.button("Submit & Process"):
-            with st.spinner("Processing..."):
-                process_pdfs(pdf_docs)
-                get_vector_store()
-                st.success("Done")
-            # Display metadata.csv
-                st.write("The files you uploaded have been assigned the following indices:")
-                metadata_df = pd.read_csv("metadata.csv")
-                st.dataframe(metadata_df)
-    
 
+        # File uploader widget
+        pdf_docs = st.file_uploader("Upload your PDF Files and Click on the Submit & Process Button", accept_multiple_files=True, type=["pdf"])
+
+        # Check if the submit button is clicked
+        if st.button("Submit & Process"):
+            # Check if files are uploaded
+            if not pdf_docs:
+                st.warning("Please upload at least one PDF file to proceed.")
+            else:
+                with st.spinner("Processing..."):
+                    process_pdfs(pdf_docs)
+                    get_vector_store()
+                    st.success("Done")
+
+        # Dropdown for retriever type selection
+        st.write("Select a Retriever Type:")
+        retriever_type = st.selectbox("Select Retriever Type", ["Basic Simliarity Search", "BM25 Search", "MultiQuery Retriever", "Ensemble Retriever", "RAG Fusion"])
+        
+    # Input for user question
     user_question = st.text_input("Ask a Question from the PDF Files")
     if user_question:
 
@@ -321,7 +345,6 @@ def main():
             st.dataframe(metadata_df)
         response = generate_answer(user_question, retriever_type)
         st.write("Answer: ", response)
-    
 
 
 if __name__== "__main__":
