@@ -287,9 +287,9 @@ def generate_answer(query, retriever_type):
     relevant_text = get_relevant_docs_by_selection(retriever_type, query)
     # text = " \n".join([doc.page_content for doc in relevant_text])
     prompt = make_rag_prompt(query, relevant_passage=relevant_text)
-    print(prompt)
+    # print(prompt)
     answer = generate_response(prompt)
-    return answer
+    return relevant_text, answer
 
 
 def get_relevant_docs_by_selection(retriever_type, user_query):
@@ -340,7 +340,7 @@ def main():
             st.write("The files you uploaded have been assigned the following indices:")
             metadata_df = pd.read_csv("metadata.csv")
             st.dataframe(metadata_df)
-        response = generate_answer(user_question, retriever_type)
+        relevant_text, response = generate_answer(user_question, retriever_type)
         st.write("Answer: ", response)
 
 
