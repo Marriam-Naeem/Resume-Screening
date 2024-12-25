@@ -128,7 +128,10 @@ references = []
 for query in questions:
     cxt, response = generate_answer(query,retriever_type)
     answers.append(response)
-    context.append(cxt)
+    if isinstance(cxt[0], list):
+        context.append([doc['page_content'] for doc in cxt[0]])  # Extract page_content from each document
+    else:
+        context.append([]) 
     references.append(ground_truths[questions.index(query)][0])
 
 
@@ -140,8 +143,7 @@ data = {
     "ground_truths": ground_truths,
     "reference": references
 }
-print("hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh")
-print(data)
+
 
 
 # Convert the dictionary into a Dataset object
