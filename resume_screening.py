@@ -199,11 +199,11 @@ def reciprocal_rank_fusion(results, k=60):
 
 def get_relevant_docs_RAGFusion(user_query):
     subquestions = generate_subquestions(user_query)
-    print(subquestions)
+    # print(subquestions)
     relevant_docs = get_subquestion_docs(subquestions)
-    print(relevant_docs)
+    # print(relevant_docs)
     results = reciprocal_rank_fusion(relevant_docs)
-    print(results)
+    # print(results)
     return results
 
 

@@ -128,10 +128,7 @@ references = []
 for query in questions:
     cxt, response = generate_answer(query,retriever_type)
     answers.append(response)
-    if isinstance(cxt[0], list):
-        context.append([doc['page_content'] for doc in cxt[0]])  # Extract page_content from each document
-    else:
-        context.append([]) 
+    context.append([entry[0]['page_content'] for entry in cxt])  # Extract page_content from each document
     references.append(ground_truths[questions.index(query)][0])
 
 
@@ -144,6 +141,7 @@ data = {
     "reference": references
 }
 
+print(data["contexts"])
 
 
 # Convert the dictionary into a Dataset object
@@ -173,6 +171,3 @@ result = evaluate(
 df = result.to_pandas()
 
 df.to_csv("evaluation_result.csv", index=False)
-
-
-
