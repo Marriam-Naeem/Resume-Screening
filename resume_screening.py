@@ -2,17 +2,17 @@ import streamlit as st
 from PyPDF2 import PdfReader
 import os
 from json import dumps, loads
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
 from langchain_community.vectorstores import Chroma
-from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.retrievers.multi_query import MultiQueryRetriever
 from dotenv import load_dotenv
 from langchain_community.retrievers import BM25Retriever
 from langchain.retrievers import EnsembleRetriever
 import pandas as pd
 from langchain_community.document_loaders import CSVLoader 
-from langchain.retrievers.multi_query import MultiQueryRetriever
 from langchain.schema import HumanMessage, SystemMessage, AIMessage
+from langchain.prompts import PromptTemplate
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 
 load_dotenv()
@@ -42,11 +42,10 @@ def process_pdfs(pdf_docs):
         # Save metadata
         metadata.append({"index": index, "file_name": pdf.name})
 
-        # Split text into chunks
-        chunk_size = 800
-        for i in range(0, len(text), chunk_size):
-            chunk = text[i:i + chunk_size]
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=50)
+        for chunk in text_splitter.split_text(text):
             data.append({"index": index, "text": chunk})
+        
         index += 1
 
     # Save to CSV
@@ -253,28 +252,48 @@ def get_relevant_docs_with_ensemble(user_query):
     return relevant_docs
 
 
-def make_rag_prompt(query, relevant_passage):
-    prompt = (
-        f"You are a helpful assistant that evaluates resumes based on the provided job description. "
-        f"Only use the information from the reference passage provided below. Do not include outside information or assumptions."
-        f"Please know that there is no repetition of data. If multiple documents share the same `source` in the metadata and `index` in the page content, It means that they are from the same resume"
-        f"If the question is not related to the resume, politely respond that you are tuned to only answer questions that are related to resumes."
-        f"\n\nYour task is as follows:"
-        f"\n1. Analyze the given job description and compare it with the resumes provided in the context."
-        f"\n2. Identify the resume that best matches the job description, and provide:"
-        f"   - The Candidate's name. , index of the resume, experince, education, skills, and any other relevant information."
-        f"   - The index of the best-matching resume in the context."
-        f"   - A detailed explanation of why this resume is the best match for the job description."
-        f"\n3. Rank the remaining resumes in order of relevance to the job description. For each, explain why it does not match perfectly and what areas are lacking compared to the best match."
-        f"\n4. **Important**: The `source` in the meta data and `index` in the page content are considered the same. If multiple documents share the same `source` and `index`, they refer to the same candidate and should be treated as such. Ignore the `row` number in the metadata as it is not relevant for evaluating candidates."
-        f"\n\nStart your response with 'Here is the Resume that Best Matches the Job Description that you have provided:'"
-        f"\n\nMaintain a professional and concise tone. Ensure your response is logical, clearly structured, and strictly based on the context provided."
-        f"\n\nQUESTION: '{query}'\n"
-        f"PASSAGE: '{relevant_passage}'\n\n"
-        f"ANSWER:"
-    )
-    return prompt
 
+def make_rag_prompt(query, relevant_passage):
+    task_guidance = (
+        "You are a helpful assistant specializing in evaluating resumes based on a provided job description. "
+        "Use only the information from the reference passage below. Do not include outside information or assumptions. "
+        "If multple Resumes are sharing the same `source` in metadata and `index` in page content, they refer to the same candidate, so treat them as one person's resume. Ignore the `row` number in the metadata as it is not relevant for evaluating candidates."
+        "\n\nYour task is as follows:"
+        "\n1. Analyze the provided job description and compare it with the resumes in the context."
+        "\n2. Identify the resume that best matches the job description and provide:"
+        "   - The Candidate's name, index of the resume, experience, education, skills, and other relevant information."
+        "   - A detailed explanation of why this resume is the best match for the job description."
+        "\n3. Rank the remaining resumes by relevance, explaining gaps in qualifications for each compared to the best match."
+        "\n4. Follow these principles:"
+        "   - **Consistency**: Ensure your evaluation is logical and adheres to the context provided."
+        "   - **Chain of Thought**: Show step-by-step reasoning in your evaluation."
+        "   - **Clarity**: Present your response in a professional, concise, and structured format."
+    )
+
+    one_shot_example = (
+        "Here is an example of your expected reasoning process:"
+        "\n--- One-shot Example ---"
+        "\nQUESTION: 'Which candidate best fits the role of Data Scientist?'"
+        "\nPASSAGE: 'Resume 1: Name: Alex, Skills: Python, Machine Learning, Data Analysis. Education: MSc Data Science. Experience: 3 years at XYZ Corp focusing on predictive modeling and data pipelines. \n"
+        "Resume 2: Name: Jamie, Skills: SQL, Data Visualization, Business Intelligence. Education: BSc Statistics. Experience: 2 years at ABC Ltd working on dashboards and reporting.'"
+        "\nANSWER:"
+        "   1. The best matching candidate is Alex because their MSc in Data Science, 3 years of experience at XYZ Corp specializing in predictive modeling and data pipelines, and expertise in Python and Machine Learning align closely with the requirements of a Data Scientist role."
+        "   2. Jamie ranks second because their skills in SQL and Data Visualization, along with 2 years of experience at ABC Ltd, are relevant but lack the advanced modeling expertise and educational background seen in Alex's profile."
+        "   3. Overall, Alex's profile demonstrates a stronger alignment with the role's core requirements."
+        "\n--- End of Example ---"
+    )
+
+    template = PromptTemplate(
+        input_variables=["query", "relevant_passage"],
+        template=(
+            "{task_guidance}\n\n"
+            "{one_shot_example}\n\n"
+            "QUESTION: '{query}'\n"
+            "PASSAGE: '{relevant_passage}'\n\n"
+            "ANSWER:"
+        )
+    )
+    return template.format(query=query, relevant_passage=relevant_passage, task_guidance=task_guidance, one_shot_example=one_shot_example)
 
 
 def generate_response(user_prompt):
