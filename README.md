@@ -131,7 +131,7 @@ Evaluation used **RAGAS metrics**:
 4. **Run the application:**
 
     ```bash
-    streamlit run app.py
+    streamlit run resume_screening.py
     ```
 
 5. **(Optional) Configure paths:**
